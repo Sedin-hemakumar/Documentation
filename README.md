@@ -24,7 +24,7 @@ export AWS_ACCESS_KEY_ID="your-key"
 export AWS_SECRET_ACCESS_KEY="your-secret"
 export AWS_DEFAULT_REGION="us-east-1"
 ```
-Install Terraform
+##Install Terraform
 macOS:
 
 brew install terraform
@@ -32,17 +32,16 @@ brew install terraform
 Or download manually from:
 https://developer.hashicorp.com/terraform/downloads
 
-
-2. Deploy the Reverse DNS Zone
+##Deploy the Reverse DNS Zone
 Go to the zone folder:
 
 cd route53/71.53.52.in-addr.arpa
 
-Initialize Terraform:
+##Initialize Terraform:
 
 terraform init
 
-Preview changes:
+##Preview changes:
 
 terraform plan
 
@@ -50,7 +49,7 @@ Apply (this creates the hosted zone + records):
 
 terraform apply
 
-🏗️ Architecture Overview
+#🏗️ Architecture Overview
 ```
 Root main.tf
        ↓

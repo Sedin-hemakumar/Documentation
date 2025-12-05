@@ -19,10 +19,11 @@ This project creates an AWS Route53 Reverse DNS Hosted Zone (e.g., 71.53.52.in-a
 1. Prerequisites
 Configure AWS Credentials
 
+```
 export AWS_ACCESS_KEY_ID="your-key"
 export AWS_SECRET_ACCESS_KEY="your-secret"
 export AWS_DEFAULT_REGION="us-east-1"
-
+```
 Install Terraform
 macOS:
 
@@ -50,7 +51,7 @@ Apply (this creates the hosted zone + records):
 terraform apply
 
 🏗️ Architecture Overview
-
+```
 Root main.tf
        ↓
     module/
@@ -58,7 +59,8 @@ Root main.tf
        ├── aws_route53_record (SOA)
        ├── aws_route53_record (NS)
        └── aws_route53_record (PTR)
-
+```
+```
 locals {
 region = "us-east-1"
 hosted_zone_name = "71.53.52.in-addr.arpa"
@@ -91,7 +93,7 @@ ptr_record_records = local.ptr_record_records
 
 comment = local.comment
 }
-
+```
 
 ## Route53 Reverse DNS Module
 

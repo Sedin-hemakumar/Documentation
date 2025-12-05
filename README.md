@@ -16,7 +16,7 @@ This project creates an AWS Route53 Reverse DNS Hosted Zone (e.g., 71.53.52.in-a
 
 
 
-#🚀 Quick Start
+# 🚀 Quick Start
 
 1. Prerequisites
 Configure AWS Credentials

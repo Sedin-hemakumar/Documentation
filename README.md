@@ -4,7 +4,7 @@
 Creates AWS Route53 reverse DNS hosted zone (71.53.52.in-addr.arpa) with SOA, NS, and PTR records.
 
 ##
-route53/
+## route53/
   └── 71.53.52.in-addr.arpa/ # Environment / Zone specific
   ├── main.tf # Root: calls module + AWS provider
   ├── variables.tf # Root variables declaration

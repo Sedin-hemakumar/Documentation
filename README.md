@@ -1,14 +1,19 @@
 # Route53 
+```
+Terraform AWS Route53 Reverse DNS Module
+This repository provides a reusable Terraform module for creating an AWS Route53 Reverse DNS Zone (e.g., 71.53.52.in-addr.arpa) along with all required DNS records:
 
-Terraform AWS Route53 Reverse DNS Zone Module
-This project creates an AWS Route53 Reverse DNS Hosted Zone (e.g., 71.53.52.in-addr.arpa) including SOA, NS, and PTR records using a reusable Terraform module.
+--> SOA (Start of Authority)
+--> NS (Name Server)
+--> PTR (Reverse Lookup)
 
+The root module passes input variables into the Route53 sub-module, and the sub-module actually creates all AWS resources.
+```
 📁 Folder Structure
 
 ```route53/
 └── 71.53.52.in-addr.arpa/      # Environment / Zone-specific folder
-    ├── main.tf                 # Root: Calls module + AWS provider
-    ├── variables.tf            # Root variables declaration
+    ├── main.tf                 # Root: Calls module + AWS provider + Local
     └── module/                 # Reusable Route53 module
         ├── main.tf             # Zone + SOA/NS/PTR records
         └── variables.tf        # Module input variables
@@ -50,17 +55,27 @@ terraform plan
 Apply (this creates the hosted zone + records):
 
 terraform apply
+```
+Terraform will then provision:
+✔ Hosted Zone
+✔ SOA Record
+✔ NS Records
+✔ PTR Records
+```
 
 # 🏗️ Architecture Overview
 ```
-Root main.tf
-       ↓
-    module/
-       ├── aws_route53_zone           (71.53.52.in-addr.arpa)
-       ├── aws_route53_record (SOA)
-       ├── aws_route53_record (NS)
-       └── aws_route53_record (PTR)
+Root main.tf (NO resources)
+        ↓ passes variables
+Module main.tf (CREATES resources)
+        ├── aws_route53_zone.my_reverse_zone
+        ├── aws_route53_record.soa_record
+        ├── aws_route53_record.ns_record
+        └── aws_route53_record.ptr_record
+
 ```
+# Root Main.tf
+ This root module only calls the sub-module:
 ```
 locals {
 region = "us-east-1"
@@ -94,13 +109,32 @@ ptr_record_records = local.ptr_record_records
 
 comment = local.comment
 }
+
+✔ No AWS resources are defined here
+✔ This only passes values to the module
 ```
 
-## Route53 Reverse DNS Module
+# 📌 Module main.tf (Actual Resource Creation)
 
-Creates an AWS Route53 reverse DNS hosted zone with required SOA, NS, and PTR records using Terraform. The module receives configuration values from root `locals` and provisions a complete reverse DNS zone (e.g., `71.53.52.in-addr.arpa` for 52.53.71.0/24 network).
+Example:
+```
+resource "aws_route53_zone" "dev" {
+  name = "dev.example.com"
 
-The module automatically creates:
+  tags = {
+    Environment = "dev"
+  }
+}
+
+resource "aws_route53_record" "dev-ns" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = "dev.example.com"
+  type    = "NS"
+  ttl     = "30"
+  records = aws_route53_zone.dev.name_servers
+}
+```
+This main.tf create the below resources:
 
 - ✅ **Hosted zone** with comment
 - ✅ **Authoritative SOA record**  
@@ -112,13 +146,13 @@ The module automatically creates:
 | Name      | Version |
 |-----------|---------|
 | terraform | >= 1.0  |
-| aws       | ~> 5.0  |
+| aws       | ~> 6.0  |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| aws  | ~> 5.0  |
+| aws  | ~> 6.0  |
 
 ## Resources
 

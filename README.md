@@ -3,13 +3,14 @@ This project creates an AWS Route53 Reverse DNS Hosted Zone (e.g., 71.53.52.in-a
 
 📁 Folder Structure
 
-route53/
+```route53/
 └── 71.53.52.in-addr.arpa/      # Environment / Zone-specific folder
     ├── main.tf                 # Root: Calls module + AWS provider
     ├── variables.tf            # Root variables declaration
     └── module/                 # Reusable Route53 module
         ├── main.tf             # Zone + SOA/NS/PTR records
         └── variables.tf        # Module input variables
+```
 
 
 

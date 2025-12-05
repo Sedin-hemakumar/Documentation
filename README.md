@@ -2,18 +2,18 @@
 # Terraform AWS Route53 Reverse DNS Zone Module
 
 Creates AWS Route53 reverse DNS hosted zone (71.53.52.in-addr.arpa) with SOA, NS, and PTR records.
-
 ## 📁 Folder Structure
 
-  route53/
-  └── 71.53.52.in-addr.arpa/ # Environment / Zone specific
-  ├── main.tf # Root: calls module + AWS provider
-  ├── variables.tf # Root variables declaration
-  └── module/ # Reusable Route53 module
-  ├── main.tf # Zone + SOA/NS/PTR records
-  └── variables.tf # Module input variables
 
-undefined
+route53/
+└── 71.53.52.in-addr.arpa/ # Environment / Zone specific
+├── main.tf # Root: calls module + AWS provider
+├── variables.tf # Root variables declaration
+└── module/ # Reusable Route53 module
+├── main.tf # Zone + SOA/NS/PTR records
+└── variables.tf # Module input variables
+
+
 ## 🚀 Quick Start
 
 ### 1. Prerequisites for local setup

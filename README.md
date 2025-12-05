@@ -168,7 +168,7 @@ This main.tf create the below resources:
 | Name                | Description                                                         | Type         | Default             | Required |
 |---------------------|---------------------------------------------------------------------|--------------|---------------------|----------|
 | `hosted_zone_name`  | Reverse DNS zone name (71.53.52.in-addr.arpa)                       | `string`     | n/a                 | yes      |
-| `comment`           | Hosted zone description                                             | `string`     | "Reverse DNS Zone"  | no       |
+| `comment`           | Hosted zone description                                             | `string`     | "testing"           | no       |
 | `soa_record_name`   | SOA record name (usually zone root)                                 | `string`     | n/a                 | yes      |
 | `soa_recordtype`    | SOA record type                                                     | `string`     | "SOA"               | no       |
 | `soa_record_ttl`    | SOA record TTL                                                      | `number`     | n/a                 | yes      |

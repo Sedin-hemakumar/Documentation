@@ -1,59 +1,62 @@
+Terraform AWS Route53 Reverse DNS Zone Module
+This project creates an AWS Route53 Reverse DNS Hosted Zone (e.g., 71.53.52.in-addr.arpa) including SOA, NS, and PTR records using a reusable Terraform module.
 
-# Terraform AWS Route53 Reverse DNS Zone Module
+📁 Folder Structure
 
-Creates AWS Route53 reverse DNS hosted zone (71.53.52.in-addr.arpa) with SOA, NS, and PTR records.
-
-##
-## route53/
-  └── 71.53.52.in-addr.arpa/ # Environment / Zone specific
-  ├── main.tf # Root: calls module + AWS provider
-  ├── variables.tf # Root variables declaration
-  └── module/ # Reusable Route53 module
-  ├── main.tf # Zone + SOA/NS/PTR records
-  └── variables.tf # Module input variables
+route53/
+└── 71.53.52.in-addr.arpa/      # Environment / Zone-specific folder
+    ├── main.tf                 # Root: Calls module + AWS provider
+    ├── variables.tf            # Root variables declaration
+    └── module/                 # Reusable Route53 module
+        ├── main.tf             # Zone + SOA/NS/PTR records
+        └── variables.tf        # Module input variables
 
 
-## 🚀 Quick Start
 
-### 1. Prerequisites for local setup
+#🚀 Quick Start
 
-**Configure AWS credentials:**
+1. Prerequisites
+Configure AWS Credentials
 
 export AWS_ACCESS_KEY_ID="your-key"
 export AWS_SECRET_ACCESS_KEY="your-secret"
 export AWS_DEFAULT_REGION="us-east-1"
 
+Install Terraform
+macOS:
 
-**Install Terraform:**
+brew install terraform
 
-brew install terraform # macOS
+Or download manually from:
+https://developer.hashicorp.com/terraform/downloads
 
-or download from terraform.io
 
+2. Deploy the Reverse DNS Zone
+Go to the zone folder:
 
-### 2. Deploy
+cd route53/71.53.52.in-addr.arpa
 
-cd route53/71.53.52.in-addr.ar
+Initialize Terraform:
 
-Initialize
 terraform init
 
-Preview changes
+Preview changes:
+
 terraform plan
 
-Apply (creates zone + records)
+Apply (this creates the hosted zone + records):
+
 terraform apply
 
-
-## 🏗️ Architecture
+🏗️ Architecture Overview
 
 Root main.tf
-↓ Calls module
-Module main.tf
-├── aws_route53_zone (71.53.52.in-addr.arpa)
-├── aws_route53_record (SOA)
-├── aws_route53_record (NS)
-└── aws_route53_record (PTR)
+       ↓
+    module/
+       ├── aws_route53_zone           (71.53.52.in-addr.arpa)
+       ├── aws_route53_record (SOA)
+       ├── aws_route53_record (NS)
+       └── aws_route53_record (PTR)
 
 locals {
 region = "us-east-1"

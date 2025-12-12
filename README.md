@@ -67,8 +67,8 @@ This runner needs a way to authenticate to AWS — without storing access keys.
 
 # 2️⃣ Runner Requests an OIDC Token from GitHub
 
-Your workflow calls the GitHub OIDC provider.
-GitHub issues a signed JWT token that contains:
+Your workflow calls the GitHub OIDC provider.<br>
+GitHub issues a signed JWT token that contains:<br>
 ```
 ==>Repository name
 ==>Branch name
@@ -80,33 +80,33 @@ GitHub issues a signed JWT token that contains:
 
 Your workflow sends the token to:
 
-==>AWS Security Token Service (STS)
+==>AWS Security Token Service (STS)<br>
 
 STS is responsible for issuing temporary AWS credentials.<br>
-This proves the workflow is trusted and coming from your exact repository.
+This proves the workflow is trusted and coming from your exact repository.<br>
 
 # 4️⃣ AWS STS Verifies the JWT
 
-AWS checks:
+AWS checks:<br>
 ✔ The signature<br>
 Must match GitHub’s OIDC signing key.<br>
 ✔ The audience<br>
-Token must be intended for AWS STS:
+Token must be intended for AWS STS:<br>
 ```
 "aud": "sts.amazonaws.com"
 
 ```
 ✔ The IAM Role Trust Policy
-Your IAM role must allow GitHub OIDC access, like:
+Your IAM role must allow GitHub OIDC access, like:<br>
 ```
 "Federated": "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
 ```
 And conditions such as repo & branch restrictions.<br>
-If ANYTHING is wrong → AWS rejects the request.
+If ANYTHING is wrong → AWS rejects the request.<br>
 
 # 5️⃣ AWS Returns Temporary Credentials
 
-If the token is valid, AWS STS gives:
+If the token is valid, AWS STS gives:<br>
 ```
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
@@ -118,7 +118,7 @@ AWS_SESSION_TOKEN
 These credentials are put into the runner’s environment variables.
 
 # 6️⃣ Terraform Uses the Credentials
-Terraform now executes:
+Terraform now executes:<br>
 ```
 terraform init
 terraform plan
@@ -133,43 +133,43 @@ AWS_SESSION_TOKEN
 
 ```
 # 7️⃣ Terraform Applies Infrastructure to AWS
-Terraform uses the credentials to modify real AWS resources in:
-=>Route53
-=>VPC
-=>EC2
-=>RDS
-=>IAM
-=>S3
-=>CloudFront
-Anything supported by AWS provider
+Terraform uses the credentials to modify real AWS resources in:<br>
+=>Route53<br>
+=>VPC<br>
+=>EC2<br>
+=>RDS<br>
+=>IAM<br>
+=>S3<br>
+=>CloudFront<br>
+Anything supported by AWS provider<br>
 
-# 🟢 Final Takeaway
-OIDC = Secure, passwordless AWS access for GitHub Actions.
-✔ No static secrets
-✔ Repo + branch restricted
-✔ Temporary credentials
-✔ Strongly verified identity
-✔ Recommended by AWS + GitHub
+# 🟢 Final Takeaway<br>
+OIDC = Secure, passwordless AWS access for GitHub Actions.<br>
+✔ No static secrets<br>
+✔ Repo + branch restricted<br>
+✔ Temporary credentials<br>
+✔ Strongly verified identity<br>
+✔ Recommended by AWS + GitHub<br>
 -------------------------------------------------------------------------------------------------------------------------------------------
 
-Here is the exact flow in simple terms:
+Here is the exact flow in simple terms:<br>
 
-✅ When is the OIDC token created?
-GitHub creates the OIDC token dynamically during a GitHub Actions job, NOT before.
-✔️ Only during the job
-When your workflow reaches this step:
+✅ When is the OIDC token created?<br>
+GitHub creates the OIDC token dynamically during a GitHub Actions job, NOT before.<br>
+✔️ Only during the job<br>
+When your workflow reaches this step:<br>
 ```
 - name: Configure AWS Credentials (OIDC)
   uses: aws-actions/configure-aws-credentials@v2
 
 ```
-GitHub automatically issues a temporary OIDC ID token for that specific job execution.
+GitHub automatically issues a temporary OIDC ID token for that specific job execution.<br>
 
-✔️ Token exists for a few seconds only
+✔️ Token exists for a few seconds only<br>
 
-It is short-lived (usually valid for < 5 minutes)
-It cannot be reused in another workflow run
-It is different for every job
+It is short-lived (usually valid for < 5 minutes)<br>
+It cannot be reused in another workflow run<br>
+It is different for every job<br>
 
 Why?
 ```
@@ -188,35 +188,35 @@ environment
 ```
 
 🔐 How AWS uses the token
-When the configure-aws-credentials step runs:
-GitHub requests an OIDC token for the current job
-GitHub sends it to AWS STS (via the action)
-AWS verifies:
-Issuer = token.actions.githubusercontent.com
-Audience (aud) = AWS
-Repo matches trust policy
-AWS returns temporary IAM credentials
-(valid for 15 minutes)
+When the configure-aws-credentials step runs:<br>
+-->GitHub requests an OIDC token for the current job<br>
+-->GitHub sends it to AWS STS (via the action)<br>
+-->AWS verifies:<br>
+-->Issuer = token.actions.githubusercontent.com<br>
+-->Audience (aud) = AWS<br>
+-->Repo matches trust policy<br>
+-->AWS returns temporary IAM credentials (valid for 15 minutes)<br>
 
-🚀 This means:
-❌ No long-term AWS credentials stored in GitHub
-✔️ Temporary AWS credentials only when job runs
-✔️ Auto-rotated, auto-expired
-✔️ You are safe even if someone leaks logs
+🚀 This means:<br>
+❌ No long-term AWS credentials stored in GitHub<br>
+✔️ Temporary AWS credentials only when job runs<br>
+✔️ Auto-rotated, auto-expired<br>
+✔️ You are safe even if someone leaks logs<br>
 
 
-📌 Example Timeline
-1️⃣ Job starts → No token yet
-2️⃣ configure-aws-credentials runs → Token created
-3️⃣ AWS validates → Returns temporary IAM Role credentials
-4️⃣ Terraform commands run using those short-lived credentials
-5️⃣ Job ends → Token expires, credentials deleted
+📌 Example Timeline<br>
+1️⃣ Job starts → No token yet<br>
+2️⃣ configure-aws-credentials runs → Token created<br>
+3️⃣ AWS validates → Returns temporary IAM Role credentials<br>
+4️⃣ Terraform commands run using those short-lived credentials<br>
+5️⃣ Job ends → Token expires, credentials deleted<br>
 
 ######## IMPORTANT #############
 
-💡 So what actually happens to the credentials?
-## Phase: What happens
-```During workflow	Temporary STS keys exist in memory
+💡 So what actually happens to the credentials?<br>
+## Phase: What happens<br>
+```
+   During workflow	Temporary STS keys exist in memory
    After workflow step	Keys removed from environment
    After workflow completes	Runner VM is destroyed
    After 15 minutes	AWS expires STS credentials
@@ -236,11 +236,11 @@ AWS returns temporary IAM credentials
 # IAM ROLE SET_UP
 
 Below is a clear, beginner-friendly, step-by-step procedure to create the IAM Role for GitHub Actions OIDC and attach it properly so Terraform can assume it.<br>
-✅ Step 1 — Enable OIDC Provider in IAM
-1. Go to AWS Console → IAM
-2. In the left menu, click Identity providers
-3. Click Add provider
-4. Fill in:
+✅ Step 1 — Enable OIDC Provider in IAM<br>
+1. Go to AWS Console → IAM<br>
+2. In the left menu, click Identity providers<br>
+3. Click Add provider<br>
+4. Fill in:<br>
 
 | Field         | Value                                         |
 | ------------- | --------------------------------------------- |
@@ -249,37 +249,37 @@ Below is a clear, beginner-friendly, step-by-step procedure to create the IAM Ro
 | Audience      | `sts.amazonaws.com`                           |
 
 5. Click Add provider
-   ➡️ Now AWS trusts GitHub as an identity provider.
+   ➡️ Now AWS trusts GitHub as an identity provider.<br>
 
-✅ Step 2 — Create the IAM Role for GitHub OIDC to Assume
-Go to AWS → IAM → Roles
-Click Create Role
-Role type:
-Web Identity → GitHub OIDC Provider
-(Select the provider you created earlier)
-Audience:
-sts.amazonaws.com
-Click Next
+✅ Step 2 — Create the IAM Role for GitHub OIDC to Assume<br>
+Go to AWS → IAM → Roles<br>
+Click Create Role<br>
+Role type:<br>
+Web Identity → GitHub OIDC Provider<br>
+(Select the provider you created earlier)<br>
+Audience:<br>
+sts.amazonaws.com<br>
+Click Next<br>
 
-✅ Step 3 — Add Permission Policies to the Role
-This depends on what Terraform will manage.
-Example: Basic permissions for Route53, EC2, S3, VPC, etc:
-✔️ For a typical Terraform admin role:
+✅ Step 3 — Add Permission Policies to the Role<br>
+This depends on what Terraform will manage.<br>
+Example: Basic permissions for Route53, EC2, S3, VPC, etc:<br>
+✔️ For a typical Terraform admin role:<br>
 ```
 AmazonEC2FullAccess
 AmazonS3FullAccess
 AmazonVPCFullAccess
 AmazonRoute53FullAccess
 ```
-IAMFullAccess (if Terraform creates IAM roles)
-Or attach your own custom policy
-⚠️ Best practice: create a custom least-privilege policy instead of full access.
-Click Next
+IAMFullAccess (if Terraform creates IAM roles)<br>
+Or attach your own custom policy<br>
+⚠️ Best practice: create a custom least-privilege policy instead of full access.<br>
+Click Next<br>
 
-✅ Step 4 — Add Trust Policy Conditions (IMPORTANT)
-Before creating the role, you must add conditions to restrict GitHub access.
-Replace <YOUR_AWS_ACCOUNT_ID>, <YOUR_GITHUB_USER_OR_ORG> and <YOUR_REPO>.
-Trust Policy (final version):
+✅ Step 4 — Add Trust Policy Conditions (IMPORTANT)<br>
+Before creating the role, you must add conditions to restrict GitHub access.<br>
+Replace <YOUR_AWS_ACCOUNT_ID>, <YOUR_GITHUB_USER_OR_ORG> and <YOUR_REPO>.<br>
+Trust Policy (final version):<br>
 
 ```
 {
@@ -311,8 +311,8 @@ Explanation:
 
 Click Create Role
 
-✅ Step 5 — Use the Role in GitHub Actions
-In your GitHub workflow:
+✅ Step 5 — Use the Role in GitHub Actions<br>
+In your GitHub workflow:<br>
 ```
 - name: Configure AWS Credentials (OIDC)
   uses: aws-actions/configure-aws-credentials@v2
@@ -321,18 +321,18 @@ In your GitHub workflow:
     aws-region: ap-south-1
 
 ```
-➡️ When this step runs, GitHub issues a temporary OIDC token
-➡️ AWS STS validates and returns temporary credentials
-➡️ Terraform now has access
+➡️ When this step runs, GitHub issues a temporary OIDC token<br>
+➡️ AWS STS validates and returns temporary credentials<br>
+➡️ Terraform now has access<br>
 
-✅ Step 6 — No Secrets Needed
-You do NOT put AWS Access/Secret keys in GitHub.
-OIDC replaces static credentials completely.
+✅ Step 6 — No Secrets Needed<br>
+You do NOT put AWS Access/Secret keys in GitHub.<br>
+OIDC replaces static credentials completely.<br>
 
-# 📌 Where is the IAM Role attached?
-There is no EC2 instance, no user, no group attached.
-The role is attached ONLY to:
-✔ The GitHub OIDC Identity Provider (IdP)
-✔ Permissions policies you added
-✔ GitHub workflow via role-to-assume
-AWS STS creates temporary credentials only at runtime. 
+# 📌 Where is the IAM Role attached?<br>
+There is no EC2 instance, no user, no group attached.<br>
+The role is attached ONLY to:<br>
+✔ The GitHub OIDC Identity Provider (IdP)<br>
+✔ Permissions policies you added<br>
+✔ GitHub workflow via role-to-assumev
+AWS STS creates temporary credentials only at runtime. <br>

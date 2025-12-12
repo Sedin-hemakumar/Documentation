@@ -335,4 +335,4 @@ The role is attached ONLY to:
 ✔ The GitHub OIDC Identity Provider (IdP)
 ✔ Permissions policies you added
 ✔ GitHub workflow via role-to-assume
-AWS STS creates temporary credentials only at runtime.
+AWS STS creates temporary credentials only at runtime. 

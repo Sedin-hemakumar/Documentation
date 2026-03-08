@@ -1,0 +1,540 @@
+# Kubernetes Rails + MySQL Deployment (Detailed Documentation)
+
+This repository contains Kubernetes manifests to deploy a **Ruby on Rails application with a MySQL database**.
+
+The goal of this setup is to demonstrate how a real application stack can be deployed in Kubernetes using:
+
+* ConfigMaps for configuration
+* Secrets for sensitive data
+* Persistent storage for databases
+* Deployments to run containers
+* Services for networking between components
+
+This setup works well for **learning Kubernetes architecture and testing locally (Minikube / Docker Desktop)**.
+
+---
+
+# 1. High Level Architecture
+
+The application consists of two main components:
+
+### Application Layer
+
+Ruby on Rails application
+
+### Database Layer
+
+MySQL database with persistent storage
+
+---
+
+# Architecture Diagram
+
+User
+│
+│ http://NodeIP:30003
+▼
+Rails Service (NodePort)
+│
+▼
+Rails Pod
+│
+│ Connects using mysql-service
+▼
+MySQL Service (ClusterIP)
+│
+▼
+MySQL Pod
+│
+▼
+PersistentVolumeClaim
+│
+▼
+PersistentVolume
+│
+▼
+Node Storage (/data)
+
+---
+
+# 2. ConfigMap
+
+File: `configmap.yaml`
+
+Purpose:
+Stores **non-sensitive configuration variables** used by the Rails application.
+
+Example:
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+name: myapp
+data:
+DB_HOST: mysql-service
+RAILS_ENV: production
+
+---
+
+## What this means
+
+ConfigMaps allow us to **separate configuration from the application image**.
+
+Instead of hardcoding environment variables inside the Docker image, Kubernetes injects them dynamically.
+
+---
+
+## Example Usage Inside Rails
+
+Rails reads environment variables like this:
+
+```ruby
+ENV["DB_HOST"]
+ENV["RAILS_ENV"]
+```
+
+After the container starts, these variables exist inside the container environment:
+
+DB_HOST=mysql-service
+RAILS_ENV=production
+
+---
+
+## Why DB_HOST = mysql-service ?
+
+Kubernetes provides **built-in DNS for Services**.
+
+When a Service is created, Kubernetes automatically creates a DNS record.
+
+Example:
+
+mysql-service.default.svc.cluster.local
+
+But inside the cluster we can simply use:
+
+mysql-service
+
+So Rails connects to MySQL using:
+
+mysql-service:3306
+
+---
+
+# 3. Secret
+
+File: `secret.yaml`
+
+Purpose:
+Stores **sensitive information** like passwords and encryption keys.
+
+Example:
+
+apiVersion: v1
+kind: Secret
+metadata:
+name: rails-secret
+type: Opaque
+stringData:
+DB_PASSWORD: "12345"
+DB_USER: "postgres"
+SECRET_KEY_BASE: "38989546d36795b192e98eb25d3aea35..."
+
+---
+
+## Why Secrets?
+
+Sensitive information should **never be stored in plain YAML or Git repositories**.
+
+Kubernetes Secrets:
+
+* Store sensitive values
+* Can be injected into containers
+* Are base64 encoded
+
+---
+
+## Example Inside Container
+
+If injected as environment variables, the container receives:
+
+DB_PASSWORD=12345
+DB_USER=postgres
+SECRET_KEY_BASE=38989546...
+
+Rails uses SECRET_KEY_BASE for:
+
+* session encryption
+* cookies
+* security tokens
+
+---
+
+# 4. PersistentVolume (PV)
+
+File: `pv.yaml`
+
+Purpose:
+Defines the **actual storage available in the Kubernetes cluster**.
+
+Example:
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+name: mypv
+spec:
+capacity:
+storage: 2Gi
+volumeMode: Filesystem
+accessModes:
+- ReadWriteOnce
+persistentVolumeReclaimPolicy: Retain
+storageClassName: slow
+hostPath:
+path: /data
+type: DirectoryOrCreate
+
+---
+
+## What PV Represents
+
+A PV represents **real storage on the cluster**.
+
+In this example:
+
+hostPath:
+/data
+
+means the data is stored on the Kubernetes node filesystem.
+
+Example location:
+
+/data/mysql-files
+
+---
+
+## Important Fields
+
+capacity
+Total storage available
+
+accessModes
+
+ReadWriteOnce → only one node can mount this volume
+
+persistentVolumeReclaimPolicy
+
+Retain → data remains even if PVC is deleted
+
+---
+
+# 5. PersistentVolumeClaim (PVC)
+
+File: `pvc.yaml`
+
+Purpose:
+Applications **cannot directly use PVs**.
+
+Instead they create a **PersistentVolumeClaim**, which requests storage.
+
+Example:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+name: mypvc
+spec:
+storageClassName: slow
+accessModes:
+- ReadWriteOnce
+resources:
+requests:
+storage: 2Gi
+
+---
+
+## Binding Process
+
+When the PVC is created:
+
+Kubernetes searches for a matching PV.
+
+Matching conditions:
+
+* storage ≥ requested storage
+* accessModes match
+* storageClass matches
+
+If everything matches:
+
+mypvc → binds to → mypv
+
+---
+
+# 6. MySQL Deployment
+
+File: `mysql-deployment.yaml`
+
+Purpose:
+Runs the MySQL database container.
+
+Example:
+
+image: mysql:8.0
+
+---
+
+## MySQL Initialization Variables
+
+MySQL Docker image requires these variables:
+
+MYSQL_ROOT_PASSWORD
+MYSQL_DATABASE
+MYSQL_USER
+MYSQL_PASSWORD
+
+Example:
+
+env:
+
+* name: MYSQL_ROOT_PASSWORD
+  valueFrom:
+  secretKeyRef:
+  name: rails-secret
+  key: DB_PASSWORD
+
+---
+
+## How Secret Mapping Works
+
+Secret:
+
+DB_PASSWORD = 12345
+
+Deployment:
+
+MYSQL_ROOT_PASSWORD → DB_PASSWORD
+
+Inside container:
+
+MYSQL_ROOT_PASSWORD=12345
+
+---
+
+# Persistent Storage Mount
+
+MySQL stores database files in:
+
+/var/lib/mysql
+
+So we mount the PVC there.
+
+volumeMounts:
+
+* name: mysql-storage
+  mountPath: /var/lib/mysql
+
+---
+
+## Storage Flow
+
+MySQL Container
+↓
+/var/lib/mysql
+↓
+PersistentVolumeClaim
+↓
+PersistentVolume
+↓
+Node Storage (/data)
+
+This ensures database data **survives pod restarts**.
+
+---
+
+# 7. MySQL Service
+
+File: `mysql-service.yaml`
+
+Purpose:
+Allows other pods (like Rails) to connect to MySQL.
+
+Example:
+
+kind: Service
+metadata:
+name: mysql-service
+spec:
+selector:
+app: mysql
+ports:
+- port: 3306
+type: ClusterIP
+
+---
+
+## What is ClusterIP?
+
+ClusterIP means the service is **only accessible inside the Kubernetes cluster**.
+
+Rails can connect to MySQL using:
+
+mysql-service:3306
+
+External users **cannot access MySQL directly**.
+
+This is good for security.
+
+---
+
+# 8. Rails Deployment
+
+File: `rails-deployment.yaml`
+
+Purpose:
+Runs the Rails application container.
+
+Example:
+
+image: my-rails-app:1.0
+
+---
+
+## Environment Variables Injection
+
+Configuration from ConfigMap:
+
+envFrom:
+
+* configMapRef:
+  name: myapp
+
+Sensitive data from Secret:
+
+env:
+
+* name: DB_PASSWORD
+  valueFrom:
+  secretKeyRef:
+  name: rails-secret
+  key: DB_PASSWORD
+
+---
+
+## Final Environment Variables Inside Container
+
+DB_HOST=mysql-service
+RAILS_ENV=production
+DB_USER=postgres
+DB_PASSWORD=12345
+SECRET_KEY_BASE=xxxxx
+
+Rails uses these values to connect to MySQL.
+
+---
+
+# 9. Rails Service
+
+File: `rails-service.yaml`
+
+Purpose:
+Exposes the Rails application to external users.
+
+Example:
+
+kind: Service
+metadata:
+name: rails-service
+spec:
+selector:
+app: rails
+ports:
+
+* port: 5000
+  targetPort: 5000
+  nodePort: 30003
+  type: NodePort
+
+---
+
+## What is NodePort?
+
+NodePort exposes a service on a port of the node.
+
+Example access:
+
+http://NodeIP:30003
+
+Example in Minikube:
+
+http://192.168.49.2:30003
+
+---
+
+# 10. Complete Deployment Flow
+
+Step 1
+PersistentVolume is created.
+
+Step 2
+PVC requests storage and binds to PV.
+
+Step 3
+MySQL pod starts and mounts the PVC.
+
+Step 4
+MySQL service exposes database internally.
+
+Step 5
+Rails pod starts.
+
+Step 6
+Rails reads configuration from ConfigMap and Secret.
+
+Step 7
+Rails connects to MySQL using mysql-service.
+
+Step 8
+Rails service exposes application via NodePort.
+
+Step 9
+User accesses application via NodeIP:30003.
+
+---
+
+# 11. Kubernetes Concepts Demonstrated
+
+ConfigMap
+Store configuration values.
+
+Secret
+Store sensitive credentials.
+
+PersistentVolume
+Actual storage resource.
+
+PersistentVolumeClaim
+Request for storage.
+
+Deployment
+Manages application pods.
+
+Service
+Provides networking and service discovery.
+
+---
+
+# 12. Production Improvements
+
+This example is simplified for learning.
+
+Production environments usually include:
+
+StatefulSets for databases
+Dynamic storage provisioning (AWS EBS, GCP PD)
+Ingress controllers instead of NodePort
+Secret managers like AWS Secrets Manager
+Horizontal Pod Autoscaling
+
+---
+

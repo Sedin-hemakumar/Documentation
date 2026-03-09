@@ -1,0 +1,392 @@
+# Kubernetes TLS Configuration for Ingress (Self-Signed Certificate)
+
+This document explains **why and how we create a Kubernetes TLS secret using a self-signed certificate** when configuring HTTPS for an application exposed through **Kubernetes Ingress**.
+
+This setup is commonly used for **local development environments such as Minikube**.
+
+---
+
+# Table of Contents
+
+1. Overview
+2. Why TLS is Needed
+3. Generate a Self-Signed Certificate
+4. Create a Kubernetes TLS Secret
+5. How Ingress Uses the TLS Secret
+6. End-to-End HTTPS Traffic Flow
+7. Verify the Secret
+8. Important Notes for Production
+
+---
+
+# 1. Overview
+
+When exposing an application through **Kubernetes Ingress**, we often want to secure the connection using **HTTPS**.
+
+To enable HTTPS, we need:
+
+* A **TLS certificate**
+* A **private key**
+* A **Kubernetes TLS Secret**
+* An **Ingress resource referencing the secret**
+
+The process looks like this:
+
+```
+OpenSSL
+   │
+   │ Generate certificate + private key
+   ▼
+tls.crt + tls.key
+   │
+   │ kubectl create secret tls
+   ▼
+Kubernetes TLS Secret
+   │
+   ▼
+Ingress Controller
+   │
+   ▼
+HTTPS enabled for the application
+```
+
+---
+
+# 2. Why TLS is Needed
+
+Without TLS:
+
+```
+Browser
+   │
+   │ http://rails.local
+   ▼
+Ingress Controller
+   │
+   ▼
+Rails Service
+   │
+   ▼
+Rails Pod
+```
+
+Traffic is **unencrypted**.
+
+With TLS:
+
+```
+Browser
+   │
+   │ https://rails.local
+   ▼
+Ingress Controller
+   │
+   │ TLS Decryption
+   ▼
+Rails Service
+   │
+   ▼
+Rails Pod
+```
+
+Benefits of TLS:
+
+* Encrypts data in transit
+* Prevents man-in-the-middle attacks
+* Provides secure communication
+
+---
+
+# 3. Generate a Self-Signed Certificate
+
+First, generate a certificate and private key using **OpenSSL**.
+
+```
+openssl req -x509 -nodes -days 365 \
+-newkey rsa:2048 \
+-keyout tls.key \
+-out tls.crt \
+-subj "/CN=rails.local/O=rails.local"
+```
+
+This command creates two files:
+
+```
+tls.key → Private Key
+tls.crt → Certificate
+```
+
+Explanation of the options:
+
+| Option             | Meaning                          |
+| ------------------ | -------------------------------- |
+| `req`              | Create certificate request       |
+| `-x509`            | Generate self-signed certificate |
+| `-nodes`           | Do not encrypt private key       |
+| `-days 365`        | Certificate valid for 365 days   |
+| `-newkey rsa:2048` | Create new RSA private key       |
+| `-keyout`          | File where private key is stored |
+| `-out`             | File where certificate is stored |
+| `-subj`            | Certificate subject information  |
+
+After running the command:
+
+```
+project/
+ ├── tls.key
+ └── tls.crt
+```
+
+---
+
+# 4. Create a Kubernetes TLS Secret
+
+Kubernetes cannot directly access files from your laptop.
+
+Therefore we store the certificate and key **inside the cluster as a Secret**.
+
+Run:
+
+```
+kubectl create secret tls rails-tls \
+  --cert=tls.crt \
+  --key=tls.key
+```
+
+What this command does:
+
+1. Reads the files `tls.crt` and `tls.key`
+2. Encodes them using Base64
+3. Stores them in Kubernetes as a Secret
+
+Resulting object:
+
+```
+Secret Name: rails-tls
+Type: kubernetes.io/tls
+```
+
+---
+
+# 5. What the Secret Looks Like
+
+You can inspect it using:
+
+```
+kubectl get secret rails-tls -o yaml
+```
+
+Example output:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rails-tls
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...
+  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0...
+```
+
+The certificate and private key are stored as **Base64 encoded values**.
+
+---
+
+# 6. How Ingress Uses the TLS Secret
+
+Your Ingress resource references this secret.
+
+Example:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rails-ingress
+spec:
+  tls:
+  - hosts:
+    - rails.local
+    secretName: rails-tls
+
+  rules:
+  - host: rails.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rails-service
+            port:
+              number: 5000
+```
+
+Important fields:
+
+| Field        | Purpose                            |
+| ------------ | ---------------------------------- |
+| `tls`        | Enables HTTPS                      |
+| `hosts`      | Domain name for the certificate    |
+| `secretName` | TLS secret containing cert and key |
+
+---
+
+# 7. What Happens Internally
+
+The **NGINX Ingress Controller** reads the TLS secret and configures HTTPS automatically.
+
+Internally, it generates an NGINX configuration like:
+
+```
+server {
+    listen 443 ssl;
+    server_name rails.local;
+
+    ssl_certificate /etc/nginx/secrets/rails-tls.crt;
+    ssl_certificate_key /etc/nginx/secrets/rails-tls.key;
+
+    location / {
+        proxy_pass http://rails-service;
+    }
+}
+```
+
+Now the Ingress controller can terminate HTTPS.
+
+---
+
+# 8. End-to-End HTTPS Flow
+
+```
+Browser
+   │
+   │ https://rails.local
+   ▼
+Nginx Ingress Controller
+   │
+   │ Uses TLS certificate from Secret
+   ▼
+Rails Service
+   │
+   ▼
+Rails Pod
+   │
+   ▼
+MySQL Pod
+```
+
+The Ingress controller decrypts HTTPS and forwards HTTP traffic internally.
+
+---
+
+# 9. Verify the Secret
+
+Check the secret:
+
+```
+kubectl get secret
+```
+
+Check the ingress configuration:
+
+```
+kubectl describe ingress rails-ingress
+```
+
+Test HTTPS:
+
+```
+curl -k https://rails.local
+```
+
+`-k` tells curl to ignore the self-signed certificate warning.
+
+---
+
+# 10. Important Notes
+
+### Self-Signed Certificates
+
+Self-signed certificates are useful for:
+
+* Local development
+* Testing environments
+* Minikube setups
+
+However browsers will show warnings like:
+
+```
+Your connection is not private
+```
+
+This is expected.
+
+---
+
+### Production Environments
+
+In production we usually use:
+
+* **Let's Encrypt**
+* **cert-manager**
+* **Cloud provider certificates**
+
+Example production flow:
+
+```
+Internet
+   │
+   ▼
+DNS
+   │
+   ▼
+Load Balancer
+   │
+   ▼
+Ingress Controller
+   │
+   ▼
+Services
+   │
+   ▼
+Pods
+```
+
+TLS certificates are issued automatically.
+
+---
+
+# Summary
+
+The command
+
+```
+kubectl create secret tls rails-tls \
+  --cert=tls.crt \
+  --key=tls.key
+```
+
+is necessary because:
+
+* Kubernetes cannot read certificate files directly from your local machine
+* The certificate must be stored **inside the cluster**
+* The Ingress controller reads this secret to enable **HTTPS**
+
+In simple terms:
+
+```
+Local Certificate Files
+        │
+        ▼
+Kubernetes TLS Secret
+        │
+        ▼
+Ingress Controller
+        │
+        ▼
+Secure HTTPS Access
+```
+
+---
